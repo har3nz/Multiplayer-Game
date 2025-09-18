@@ -2,6 +2,7 @@ import socket
 import threading
 import json
 import pygame
+import random
 
 HOST = "hands-role.gl.at.ply.gg"
 PORT = 5496
@@ -32,8 +33,8 @@ class Player:
         
         sprite_center_x = new_x + self.original_player.get_width()//2
         sprite_center_y = new_y + self.original_player.get_height()//2
-        mask_x = int(sprite_center_x - self.collision_size//2 - map_offset_x - 5)
-        mask_y = int(sprite_center_y - self.collision_size//2 - map_offset_y - 5)
+        mask_x = int(sprite_center_x - self.collision_size//2 - map_offset_x - 2)
+        mask_y = int(sprite_center_y - self.collision_size//2 - map_offset_y - 2)
         
         if (mask_x < -self.collision_size or mask_y < -self.collision_size or 
             mask_x >= self.tilemap.collision_mask.get_size()[0] or 
@@ -95,10 +96,129 @@ class Player:
     def draw(self, window):
         window.blit(self.player, (self.x, self.y))
 
+class Ghosts:
+    def __init__(self, W, H, ghost_type, tilemap=None):
+        self.sprites = Sprites()
+        #Ghost Stuff
+        self.orange_ghost_sprite = self.sprites.orange_ghost_sprite
+        self.red_ghost_sprite = self.sprites.red_ghost_sprite
+        self.teal_ghost_sprite = self.sprites.teal_ghost_sprite
+        self.vuln_ghost_sprite = self.sprites.vuln_ghost_sprite
+        # Eyes
+        self.left_eyes_sprite = self.sprites.left_eyes_sprite
+        self.right_eyes_sprite = self.sprites.right_eyes_sprite
+        self.top_eyes_sprite = self.sprites.top_eyes_sprite
+        self.bottom_eyes_sprite = self.sprites.bottom_eyes_sprite
+
+        self.tilemap = tilemap
+        self.collision_size = int(16 * 1.3)
+        self.collision_surface = pygame.Surface((self.collision_size, self.collision_size), pygame.SRCALPHA)
+        self.collision_mask = pygame.mask.from_surface(self.collision_surface)
+
+
+        self.ghost_type = ghost_type
+
+        self.spawn_locs = [
+                            (377, 268),
+                            (325, 266),
+                            (419, 266)
+                            ]
+        self.spawn_loc = random.randchoice(self.spawnlocs)
+        self.x, self.y = self.spawn_loc
+        self.dir = "None"
+        
+
+    def check_collision(self, new_x, new_y):
+        if not self.tilemap or not hasattr(self.tilemap, 'collision_mask'):
+            return False
+        
+        map_offset_x = 120
+        map_offset_y = 5
+        
+        sprite_center_x = new_x + self.original_player.get_width()//2
+        sprite_center_y = new_y + self.original_player.get_height()//2
+        mask_x = int(sprite_center_x - self.collision_size//2 - map_offset_x - 2)
+        mask_y = int(sprite_center_y - self.collision_size//2 - map_offset_y - 2)
+        
+        if (mask_x < -self.collision_size or mask_y < -self.collision_size or 
+            mask_x >= self.tilemap.collision_mask.get_size()[0] or 
+            mask_y >= self.tilemap.collision_mask.get_size()[1]):
+            return True
+        
+        overlap = self.tilemap.collision_mask.overlap(self.collision_mask, (mask_x, mask_y))
+        return overlap is not None
+    
+    def controls(self, dt):
+        keys = pygame.key.get_pressed()
+        self.vx = 0
+        self.vy = 0
+        if keys[pygame.K_a]: 
+            self.dir = "left"
+            self.player = pygame.transform.rotate(self.original_player, 180)
+        elif keys[pygame.K_d]: 
+            self.dir = "right"
+            self.player = pygame.transform.rotate(self.original_player, 0)
+        elif keys[pygame.K_w]: 
+            self.dir = "up"
+            self.player = pygame.transform.rotate(self.original_player, 90)
+        elif keys[pygame.K_s]: 
+            self.dir = "down"
+            self.player = pygame.transform.rotate(self.original_player, -90)
+        
+        if self.dir == "left":
+            self.vx = -self.speed
+        elif self.dir == "right":
+            self.vx = self.speed
+        elif self.dir == "down":
+            self.vy = self.speed
+        elif self.dir == "up":
+            self.vy = -self.speed
+
+        new_x = self.x + self.vx * dt
+        new_y = self.y + self.vy * dt
+        
+        if not self.check_collision(new_x, self.y):
+            self.x = new_x
+        else:
+            self.vx = 0
+            if self.check_collision(self.x, self.y):
+                for push in [-2, 2, -4, 4]:
+                    if not self.check_collision(self.x + push, self.y):
+                        self.x += push
+                        break
+            
+        if not self.check_collision(self.x, new_y):
+            self.y = new_y
+        else:
+            self.vy = 0
+            if self.check_collision(self.x, self.y):
+                for push in [-2, 2, -4, 4]:
+                    if not self.check_collision(self.x, self.y + push):
+                        self.y += push
+                        break
+
+    def draw(self, window):
+        window.blit(self.player, (self.x, self.y))
+
+
+
 class Sprites:
     def __init__(self):
         self.tilemap_sprite = pygame.transform.scale_by(pygame.image.load("sprites/tilemap.png").convert_alpha(), 2.0)
         self.pacman_sprite = pygame.transform.scale_by(pygame.image.load("sprites/pacman.png").convert_alpha(), 1.3)
+
+        #Ghost Stuff
+        self.orange_ghost_sprite = pygame.transform.scale_by(pygame.image.load("sprites/ghosts/orange_ghost.png").convert_alpha(), 1.3)
+        self.red_ghost_sprite = pygame.transform.scale_by(pygame.image.load("sprites/ghosts/red_ghost.png").convert_alpha(), 1.3)
+        self.teal_ghost_sprite = pygame.transform.scale_by(pygame.image.load("sprites/ghosts/teal_ghost.png").convert_alpha(), 1.3)
+
+        self.vuln_ghost_sprite = pygame.transform.scale_by(pygame.image.load("sprites/ghosts/vuln_ghost.png").convert_alpha(), 1.3)
+
+        # Eyes
+        self.left_eyes_sprite = pygame.transform.scale_by(pygame.image.load("sprites/ghosts/left_eyes.png").convert_alpha(), 1.3)
+        self.right_eyes_sprite = pygame.transform.scale_by(pygame.image.load("sprites/ghosts/right_eyes.png").convert_alpha(), 1.3)
+        self.top_eyes_sprite = pygame.transform.scale_by(pygame.image.load("sprites/ghosts/top_eyes.png").convert_alpha(), 1.3)
+        self.bottom_eyes_sprite = pygame.transform.scale_by(pygame.image.load("sprites/ghosts/bottom_eyes.png").convert_alpha(), 1.3)
 
 
 class Tilemap:
@@ -163,9 +283,15 @@ class Game:
 
         self.player = Player(self.W, self.H, self.Tilemap)
         self.other_players = {}
+        self.my_role = None
+        self.game_state = "playing"
+        self.identification_attempts = 0
+        self.sprites = Sprites()
+        self.roles_cache = {}
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.settimeout(0.1)
+        self.sent_role = False
 
         self.last_send = 0
         self.UPDATE_INTERVAL = 0.05
@@ -178,18 +304,52 @@ class Game:
                 snapshot = json.loads(data.decode())
 
                 positions = snapshot.get("positions", {})
+                roles = snapshot.get("roles", {})
+                game_state = snapshot.get("game_state", "playing")
+                
+                if game_state != self.game_state:
+                    if game_state == "resetting":
+                        print("Game is resetting...")
+                        self.my_role = None
+                    elif game_state == "playing" and self.game_state == "resetting":
+                        print("Game resumed!")
+                        self.player.x = self.W / 2
+                        self.player.y = self.H / 2
+                        self.my_name = None
+                        self.identification_attempts = 0
+                    self.game_state = game_state
 
-                if self.my_name is None:
+                if self.my_name is None and self.identification_attempts < 50:
+                    self.identification_attempts += 1
+                    
+                    best_match = None
+                    best_distance = float('inf')
+                    
                     for name, pos in positions.items():
-                        if abs(pos["x"] - self.player.x) < 1 and abs(pos["y"] - self.player.y) < 1:
-                            self.my_name = name
-                            print("I am", self.my_name)
-                            break
+                        distance = abs(pos["x"] - self.player.x) + abs(pos["y"] - self.player.y)
+                        if distance < best_distance and distance < 30:
+                            best_distance = distance
+                            best_match = name
+                    
+                    if best_match and self.identification_attempts > 5:
+                        self.my_name = best_match
+                        print(f"I am {self.my_name} (distance: {best_distance:.1f})")
+
+                if self.my_name and roles and (self.my_role is None or game_state == "playing"):
+                    if self.my_name in roles:
+                        new_role = roles[self.my_name]
+                        if new_role != self.my_role:
+                            self.my_role = new_role
+                            print(f"My role: {self.my_role}")
+                
+                if roles:
+                    if roles != self.roles_cache:
+                        print(f"Roles updated: {roles}")
+                        self.roles_cache = roles
 
                 self.other_players = positions
             except:
                 continue
-
 
 
     def update(self):
@@ -198,6 +358,8 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    print(pygame.mouse.get_pos())
 
             self.player.controls(dt)
 
@@ -217,17 +379,64 @@ class Game:
             for name, other_pos in self.other_players.items():
                 if name == self.my_name:
                     continue
-                other_sprite = self.player.original_player
-                if other_pos.get("dir") == "left":
-                    other_sprite = pygame.transform.rotate(other_sprite, 180)
-                elif other_pos.get("dir") == "right":
-                    other_sprite = pygame.transform.rotate(other_sprite, 0)
-                elif other_pos.get("dir") == "up":
-                    other_sprite = pygame.transform.rotate(other_sprite, 90) 
-                elif other_pos.get("dir") == "down":
-                    other_sprite = pygame.transform.rotate(other_sprite, -90)
-
-                self.window.blit(other_sprite, (other_pos["x"], other_pos["y"]))
+                
+                player_role = self.roles_cache.get(name)
+                
+                if not player_role or not self.roles_cache:
+                    other_sprite = self.player.original_player
+                    if other_pos.get("dir") == "left":
+                        other_sprite = pygame.transform.rotate(other_sprite, 180)
+                    elif other_pos.get("dir") == "right":
+                        other_sprite = pygame.transform.rotate(other_sprite, 0)
+                    elif other_pos.get("dir") == "up":
+                        other_sprite = pygame.transform.rotate(other_sprite, 90) 
+                    elif other_pos.get("dir") == "down":
+                        other_sprite = pygame.transform.rotate(other_sprite, -90)
+                    else:
+                        other_sprite = self.player.original_player
+                    
+                    self.window.blit(other_sprite, (other_pos["x"], other_pos["y"]))
+                    
+                elif player_role == "pacman":
+                    other_sprite = self.player.original_player
+                    if other_pos.get("dir") == "left":
+                        other_sprite = pygame.transform.rotate(other_sprite, 180)
+                    elif other_pos.get("dir") == "right":
+                        other_sprite = pygame.transform.rotate(other_sprite, 0)
+                    elif other_pos.get("dir") == "up":
+                        other_sprite = pygame.transform.rotate(other_sprite, 90) 
+                    elif other_pos.get("dir") == "down":
+                        other_sprite = pygame.transform.rotate(other_sprite, -90)
+                    else:
+                        other_sprite = self.player.original_player
+                    
+                    self.window.blit(other_sprite, (other_pos["x"], other_pos["y"]))
+                    
+                else:
+                    if player_role == "red":
+                        ghost_sprite = self.sprites.red_ghost_sprite
+                    elif player_role == "blue":
+                        ghost_sprite = self.sprites.teal_ghost_sprite
+                    elif player_role == "yellow":
+                        ghost_sprite = self.sprites.orange_ghost_sprite
+                    else:
+                        ghost_sprite = self.sprites.red_ghost_sprite
+                    
+                    self.window.blit(ghost_sprite, (other_pos["x"], other_pos["y"]))
+                    
+                    direction = other_pos.get("dir", "right")
+                    if direction == "left":
+                        eye_sprite = self.sprites.left_eyes_sprite
+                    elif direction == "right":
+                        eye_sprite = self.sprites.right_eyes_sprite
+                    elif direction == "up":
+                        eye_sprite = self.sprites.top_eyes_sprite
+                    elif direction == "down":
+                        eye_sprite = self.sprites.bottom_eyes_sprite
+                    else:
+                        eye_sprite = self.sprites.right_eyes_sprite
+                    
+                    self.window.blit(eye_sprite, (other_pos["x"], other_pos["y"]))
 
             pygame.display.flip()
 
