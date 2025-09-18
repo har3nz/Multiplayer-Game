@@ -7,9 +7,9 @@ HOST = "hands-role.gl.at.ply.gg"
 PORT = 5496
 
 class Player:
-    def __init__(self, W, H):
+    def __init__(self, W, H, tilemap=None):
         self.x = W / 2
-        self.y = H / 2
+        self.y = H / 2 + 5
         self.vx = 0
         self.vy = 0
         self.speed = 150
@@ -17,7 +17,32 @@ class Player:
         self.original_player = self.sprites.pacman_sprite
         self.player = self.original_player
         self.dir = "None"
+        self.tilemap = tilemap
+        self.collision_size = int(16 * 1.3)
+        self.collision_surface = pygame.Surface((self.collision_size, self.collision_size), pygame.SRCALPHA)
+        pygame.draw.circle(self.collision_surface, (255, 255, 255, 255), (self.collision_size//2, self.collision_size//2), self.collision_size//2)
+        self.collision_mask = pygame.mask.from_surface(self.collision_surface)
 
+    def check_collision(self, new_x, new_y):
+        if not self.tilemap or not hasattr(self.tilemap, 'collision_mask'):
+            return False
+        
+        map_offset_x = 120
+        map_offset_y = 5
+        
+        sprite_center_x = new_x + self.original_player.get_width()//2
+        sprite_center_y = new_y + self.original_player.get_height()//2
+        mask_x = int(sprite_center_x - self.collision_size//2 - map_offset_x - 5)
+        mask_y = int(sprite_center_y - self.collision_size//2 - map_offset_y - 5)
+        
+        if (mask_x < -self.collision_size or mask_y < -self.collision_size or 
+            mask_x >= self.tilemap.collision_mask.get_size()[0] or 
+            mask_y >= self.tilemap.collision_mask.get_size()[1]):
+            return True
+        
+        overlap = self.tilemap.collision_mask.overlap(self.collision_mask, (mask_x, mask_y))
+        return overlap is not None
+    
     def controls(self, dt):
         keys = pygame.key.get_pressed()
         self.vx = 0
@@ -44,11 +69,28 @@ class Player:
         elif self.dir == "up":
             self.vy = -self.speed
 
-
-
-
-        self.x += self.vx * dt
-        self.y += self.vy * dt
+        new_x = self.x + self.vx * dt
+        new_y = self.y + self.vy * dt
+        
+        if not self.check_collision(new_x, self.y):
+            self.x = new_x
+        else:
+            self.vx = 0
+            if self.check_collision(self.x, self.y):
+                for push in [-2, 2, -4, 4]:
+                    if not self.check_collision(self.x + push, self.y):
+                        self.x += push
+                        break
+            
+        if not self.check_collision(self.x, new_y):
+            self.y = new_y
+        else:
+            self.vy = 0
+            if self.check_collision(self.x, self.y):
+                for push in [-2, 2, -4, 4]:
+                    if not self.check_collision(self.x, self.y + push):
+                        self.y += push
+                        break
 
     def draw(self, window):
         window.blit(self.player, (self.x, self.y))
@@ -101,6 +143,8 @@ class Tilemap:
                 if tile_index == -1 or tile_index >= len(self.tiles):
                     continue
                 self.map_surface.blit(self.tiles[tile_index], (col*32, row*32))
+        
+        self.collision_mask = pygame.mask.from_surface(self.map_surface)
     
     def draw(self, window):
         window.blit(self.map_surface, (120, 5))
@@ -117,7 +161,7 @@ class Game:
 
         self.Tilemap = Tilemap()
 
-        self.player = Player(self.W, self.H)
+        self.player = Player(self.W, self.H, self.Tilemap)
         self.other_players = {}
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
