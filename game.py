@@ -145,24 +145,21 @@ class Ghosts:
         
 
     def check_collision(self, new_x, new_y):
-        if not self.tilemap or not hasattr(self.tilemap, 'collision_mask'):
+        if not self.tilemap or not hasattr(self.tilemap, "collision_mask"):
             return False
-        
-        map_offset_x = 120
-        map_offset_y = 5
-        
-        sprite_center_x = new_x + self.ghost_sprite.get_width()//2
-        sprite_center_y = new_y + self.ghost_sprite.get_height()//2
-        mask_x = int(sprite_center_x - self.collision_size//2 - map_offset_x - 2)
-        mask_y = int(sprite_center_y - self.collision_size//2 - map_offset_y - 2)
-        
-        if (mask_x < -self.collision_size or mask_y < -self.collision_size or 
-            mask_x >= self.tilemap.collision_mask.get_size()[0] or 
-            mask_y >= self.tilemap.collision_mask.get_size()[1]):
+
+        mask_w, mask_h = self.collision_mask.get_size()
+        map_offset_x, map_offset_y = 120, 5
+
+        mask_x = int(new_x - map_offset_x)
+        mask_y = int(new_y - map_offset_y)
+
+        tw, th = self.tilemap.collision_mask.get_size()
+        if mask_x + mask_w <= 0 or mask_y + mask_h <= 0 or mask_x >= tw or mask_y >= th:
             return True
-        
-        overlap = self.tilemap.collision_mask.overlap(self.collision_mask, (mask_x, mask_y))
-        return overlap is not None
+
+        return self.tilemap.collision_mask.overlap(self.collision_mask, (mask_x, mask_y)) is not None
+
     
     def controls(self, dt):
         keys = pygame.key.get_pressed()
@@ -191,23 +188,9 @@ class Ghosts:
         
         if not self.check_collision(new_x, self.y):
             self.x = new_x
-        else:
-            self.vx = 0
-            if self.check_collision(self.x, self.y):
-                for push in [-2, 2, -4, 4]:
-                    if not self.check_collision(self.x + push, self.y):
-                        self.x += push
-                        break
-            
         if not self.check_collision(self.x, new_y):
             self.y = new_y
-        else:
-            self.vy = 0
-            if self.check_collision(self.x, self.y):
-                for push in [-2, 2, -4, 4]:
-                    if not self.check_collision(self.x, self.y + push):
-                        self.y += push
-                        break
+        
 
     def draw(self, window):
         
