@@ -132,15 +132,20 @@ class Game:
             try:
                 data, _ = self.sock.recvfrom(1024)
                 snapshot = json.loads(data.decode())
+
+                positions = snapshot.get("positions", {})
+
                 if self.my_name is None:
-                    for name, pos in snapshot.items():
+                    for name, pos in positions.items():
                         if abs(pos["x"] - self.player.x) < 1 and abs(pos["y"] - self.player.y) < 1:
                             self.my_name = name
-                            print(self.my_name)
+                            print("I am", self.my_name)
                             break
-                self.other_players = snapshot
+
+                self.other_players = positions
             except:
                 continue
+
 
 
     def update(self):
@@ -174,7 +179,7 @@ class Game:
                 elif other_pos.get("dir") == "right":
                     other_sprite = pygame.transform.rotate(other_sprite, 0)
                 elif other_pos.get("dir") == "up":
-                    other_sprite = pygame.transform.rotate(other_sprite, 90)
+                    other_sprite = pygame.transform.rotate(other_sprite, 90) 
                 elif other_pos.get("dir") == "down":
                     other_sprite = pygame.transform.rotate(other_sprite, -90)
 
