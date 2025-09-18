@@ -11,9 +11,10 @@ PORT = 65432
 clients = {}
 positions = {}
 last_seen = {} 
+ready_status = {}
 lock = threading.Lock()
 
-roles = ["red", "blue", "yellow"]
+roles = ["red", "blue", "orange"]
 game_roles = {}
 pacman_chosen = False
 player_counter = 0
@@ -29,16 +30,22 @@ def receive_loop():
     while True:
         try:
             data, addr = sock.recvfrom(1024)
-            pos = json.loads(data.decode())
+            message = json.loads(data.decode())
         except:
             continue
         with lock:
             if addr not in clients:
                 player_counter += 1
                 clients[addr] = f"player{player_counter}"
+                ready_status[addr] = True
                 print(f"{clients[addr]} joined")
 
-            positions[addr] = pos
+            if "ready" in message:
+                ready_status[addr] = message["ready"]
+                print(f"{clients[addr]} ready status: {ready_status[addr]}")
+            else:
+                positions[addr] = message
+            
             last_seen[addr] = time.time()
 
 threading.Thread(target=receive_loop, daemon=True).start()
@@ -105,7 +112,7 @@ def reset_game():
             else:
                 if addr in positions:
                     positions[addr]["x"] = 400
-                    positions[addr]["y"] = 300
+                    positions[addr]["y"] = 305
                     positions[addr]["dir"] = "None"
         
         print("Game reset! New roles:")
@@ -123,12 +130,16 @@ while True:
             positions.pop(addr, None)
             clients.pop(addr, None)
             game_roles.pop(addr, None)
+            ready_status.pop(addr, None)
             last_seen.pop(addr, None)
 
         if game_state == "resetting" and now - reset_timer > RESET_DELAY:
             reset_game()
         
-        if len(clients) >= 2 and not game_roles:
+        ready_count = sum(1 for ready in ready_status.values() if ready)
+        all_ready = len(clients) >= 2 and ready_count == len(clients)
+        
+        if all_ready and not game_roles:
             pacman_addr = random.choice(list(clients.keys()))
             game_roles[pacman_addr] = "pacman"
             
@@ -147,7 +158,7 @@ while True:
                 else:
                     if addr in positions:
                         positions[addr]["x"] = 400
-                        positions[addr]["y"] = 300
+                        positions[addr]["y"] = 305
                         positions[addr]["dir"] = "None"
 
             print("Game started!")
